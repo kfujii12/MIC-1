@@ -57,8 +57,8 @@ main:
                                 /* file pointer in r0 */
     mov r11, r0                  /* Save file pointer so we can access later */                            
     
-    /* Set up SP */ 
-    ldr mic1_SP, =stack
+    /* Set up LV */ 
+    ldr mic1_LV, =stack
     
     /* Need to loop through this until you hit an EOF */
 loop:
@@ -71,7 +71,7 @@ loop:
     beq end
     
     /* Set PC, SP, LV */
-    strb r0, [mic1_SP], #+1    /* Put the first character into the top of the stack and move the stack pointer */
+    strb r0, [mic1_LV], #+1    /* Put the first character into the top of the stack and move the stack pointer */
     mov r0, r11             /* Move the file pointer back to r0 */
     b loop
 end:   
