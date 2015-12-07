@@ -77,10 +77,29 @@ loop:
 end:   
     /* Set the PC to the start of the stack */
     ldr mic1_PC, =stack
-
+      
     /* The LV should be in the correct position already, one byte past the PC */
     /* The SP should use the number of parameters and the LV to calculate its position */
-    ldr mic1_SP, [mic1_LV, +mic1_PC]
+    @ load stack pointer with the first byte from the program and increment the PC
+    @ Shift by 8 bits
+    ldrb r12, [mic1_PC], #+1
+    mov mic1_SP, r12
+    LSL mic1_SP, #3
+    @ Or with the next byte
+    @ multiply offset by 4 (shift by 2)
+    ldrb r12, [mic1_PC], #+1
+    orr mic1_SP, r12
+    LSL mic1_SP, #2
+    @ Add to LV 
+    add mic1_SP, mic1_LV
+    @ subtract one word (-4) because SP should be pointing to the last local variable actually
+    sub mic1_SP, #4
+    
+    
+    _DBP_ mic1_LV
+    _DBP_ mic1_PC
+    _DBP_ mic1_SP
+
     
     pop {lr}
     bx lr
