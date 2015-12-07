@@ -75,7 +75,12 @@ loop:
     mov r0, r11             /* Move the file pointer back to r0 */
     b loop
 end:   
+    /* Set the PC to the start of the stack */
     ldr mic1_PC, =stack
+
+    /* The LV should be in the correct position already, one byte past the PC */
+    /* The SP should use the number of parameters and the LV to calculate its position */
+    ldr mic1_SP, [mic1_LV, +mic1_PC]
     
     pop {lr}
     bx lr
