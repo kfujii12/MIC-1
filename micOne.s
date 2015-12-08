@@ -19,10 +19,18 @@
     str mic1_MDR, [mic1_MAR]         
 .endm
 
+.macro _INC_PC_FETCH_
+    add mic1_PC, #1
+    ldrsb mic1_MBR, [mic1_PC], #+1
+    ldrb mic1_MBRU, [mic1_PC], #+1
+.endm
+
 .macro _FETCH_
     ldrsb mic1_MBR, [mic1_PC], #+1
     ldrb mic1_MBRU, [mic1_PC], #+1
 .endm
+
+
 
 /***** NAMING REGISTERS *****/
 mic1_MAR .req r2 
@@ -151,61 +159,195 @@ nop:
     b Main1
     
 iadd:
-    
+    ldr mic1_MAR, [mic1_SP, #-4]!
+    _RD_
+    ldr mic1_H, [mic1_TOS]
+    add mic1_TOS, mic1_MDR, mic1_H
+    mov mic1_MDR, mic1_TOS
+    _WR_
     b Main1            
 
 isub:
+    ldr mic1_MAR, [mic1_SP, #-4]!
+    _RD_
+    ldr mic1_H, [mic1_TOS]
+    sub mic1_TOS, mic1_MDR, mic1_H
+    mov mic1_MDR, mic1_TOS
+    _WR_
     b Main1            
 
 iand:
+    ldr mic1_MAR, [mic1_SP, #-4]
+    _RD_
+    ldr mic1_H, [mic1_TOS]
+    and mic1_TOS, mic1_MDR, mic1_H
+    ldr mic1_MDR, mic1_TOS
+    _WR_
     b Main1 
     
 ior:
+    ldr mic1_MAR, [mic1_SP, #-4]
+    _RD_
+    ldr mic1_H, [mic1_TOS]
+    orr mic1_TOS, mic1_MDR, mic1_H
+    ldr mic1_MDR, mic1_TOS
+    _WR_
     b Main1
 
 dup:
+    ldr mic1_MAR, [mic1_SP, #+4]!
+    mov mic1_MDR, [mic1_TOS]
+    _WR_
     b Main1
     
 pop:
+    ldr mic1_MAR, [mic1_SP, #-4]!
+    mov mic1_TOS, mic1_MDR
     b Main1
     
 swap:
+    @ macro?
+    ldr mic1_MAR, [mic1_SP], #-1
+    _RD_
+    ldr mic1_MAR, [mic1_SP]
+    mov mic1_H, mic1_MDR
+    _WR_
+    mov mic1_MDR, mic1_TOS
+    ldr mic1_MAR, [mic1_SP], #-1
+    _WR_
+    mov mic1_TOS, mic1_H
     b Main1
     
 bipush:
+    /* This might be broken from this first line */
+    ldr mic1_MAR, [mic1_SP, #+1]!
+    mov mic1_TOS, mic1_MBR
+    mov mic1_MDR, mic1_TOS
+    _WR_
+    _INC_PC_FETCH_
     b Main1
     
 iload:
+    mov mic1_H, mic1_LV
+    add mic1_MAR, mic1_MBRU, mic1_H
+    _RD_
+    ldr mic1_MAR, [mic1_SP, #+1]!
+    mov mic1_TOS, mic1_MDR
+    _INC_PC_FETCH_
+    _WR_
     b Main1
     
 istore:
+    mov mic1_H, mic1_LV
+    add mic1_MAR, mic1_MBRU, mic1_H
+    mov mic1_MDR, mic1_TOS
+    _WR_
+    ldr mic1_MAR, [mic1_SP, #-1]!
+    _RD_
+    mov mic1_TOS, mic1_MDR
+    _INC_PC_FETCH_
     b Main1
     
 iinc:
+    mov mic1_H, mic1_LV
+    add mic1_MAR, mic1_MBRU, mic1_H
+    _RD_
+    mov mic1_H, mic1_MDR
+    _INC_PC_FETCH_
+    ADD mic1_MDR, mic1_MBR, mic1_H
+    _WR_
+    _INC_PC_FETCH_
     b Main1
     
 goto:
+    sub mic1_OPC, mic1_PC, #-1
+    mov h, mic1_MBR, LSL #8
+    _INC_PC_FETCH_
+    orr mic1_H, mic1_MBRU
+    _INC_PC_FETCH_
     b Main1
     
 iflt:
-    b Main1
+    ldr mic1_MAR, [mic1_SP, #-1]!
+    _RD_
+    movs mic1_OPC, mic1_TOS
+    mov mic1_TOS, mic1_MDR
+    bmi T
+    b F
     
 ifeq:
-    b Main1
+    ldr mic1_MAR, [mic1_SP, #-1]!
+    _RD_
+    movs mic1_OPC, mic1_TOS
+    mov mic1_TOS, mic1_MDR
+    beq T
+    b F
     
 if_icmpeq:
-    b Main1
+    ldr mic1_MAR, [mic1_SP, #-1]!
+    _RD_
+    ldr mic1_MAR, [mic1_SP, #-1]!
+    mov mic1_H, mic1_MDR
+    _RD_
+    movs mic1_OPC, mic1_TOS
+    mov mic1_TOS, mic1_MDR
+    beq T
+    b F
     
 T:
+    sub mic1_OPC, mic1_PC, #-1
     b Main1
     
 F:
+    add mic1_PC, #1
+    _INC_PC_FETCH_
     b Main1
     
 jsr:
+    add mic1_SP, mic1_MBRU
+    add mic1_SP, #R
+    mov mic1_MDR, mic1_CPP
+    mov mic1_CPP, mic1_SP
+    mov mic1_MAR, mic1_CPP
+    _WR_
+    add mic1_MDR, mic1_PC, #4
+    ldr mic1_MAR, [mic1_SP, #+4]!
+    _WR_
+    mov mic1_MDR, mic1_LV
+    ldr mic1_MAR, [mic1_SP, #+1]!
+    _WR_
+    sub mic1_LV, mic1_SP, #2
+    sub mic1_LV, mic1_MBRU
+    _INC_PC_FETCH_
+    /* Need nop? */
+    sub mic1_LV, mic1_MBRU
+    _INC_PC_FETCH_
+    /* is this shift left 8 or 3 */
+    mov mic1_H, mic1_MBR, LSL #8
+    _INC_PC_FETCH_
+    orr r0, mic1_H, mic1_MBRU
+    sub mic1_PC, #4
+    add mic1_PC, r0
+    _FETCH_
     b Main1
     
 ret:
+    mov mic1_MAR, mic1_CPP
+    _RD_
+    /* need nop? */
+    mov mic1_CPP, mic1_MDR
+    add mic1_MAR, #1
+    _RD_
+    /* nop? */
+    mov mic1_PC, mic1_MDR
+    _FETCH_
+    add mic1_MAR, #1
+    _RD_
+    mov mic1_MAR, mic1_LV
+    mov mic1_SP, mic1_MAR
+    mov mic1_LV, mic1_MDR
+    mov mic1_MDR, mic1_TOS
+    _WR_
     b Main1
     
     pop {lr}
