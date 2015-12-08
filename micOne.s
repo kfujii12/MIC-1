@@ -9,6 +9,21 @@
     pop {r0, r1, r2, r3}
 .endm
 
+.macro _RD_
+    @ Loads the information from the MAR into the MDR
+    ldr mic1_MDR, [mic1_MAR]
+.endm
+
+.macro _WR_
+    @ Puts address into MAR and puts it into the MDR
+    str mic1_MDR, [mic1_MAR]         
+.endm
+
+.macro _FETCH_
+    ldrsb mic1_MBR, [mic1_PC], #+1
+    ldrb mic1_MBRU, [mic1_PC], #+1
+.endm
+
 /***** NAMING REGISTERS *****/
 mic1_MAR .req r2 
 mic1_MDR .req r3
@@ -29,7 +44,7 @@ debug_printf_format:
     .asciz "%d\n"
 
 .balign 4
-stack: .skip 4096
+memory: .skip 4096
 
 .balign 4
 readMode:
@@ -58,7 +73,7 @@ main:
     mov r11, r0                  /* Save file pointer so we can access later */                            
     
     /* Set up LV */ 
-    ldr mic1_LV, =stack
+    ldr mic1_LV, =memory
     
     /* Need to loop through this until you hit an EOF */
 loop:
@@ -72,11 +87,11 @@ loop:
     
     /* Set PC, SP, LV */
     strb r0, [mic1_LV], #+1    /* Put the first character into the top of the stack and move the stack pointer */
-    mov r0, r11             /* Move the file pointer back to r0 */
+    mov r0, r11                /* Move the file pointer back to r0 */
     b loop
 end:   
     /* Set the PC to the start of the stack */
-    ldr mic1_PC, =stack
+    ldr mic1_PC, =memory
       
     /* The LV should be in the correct position already, one byte past the PC */
     /* The SP should use the number of parameters and the LV to calculate its position */
@@ -95,11 +110,103 @@ end:
     @ subtract one word (-4) because SP should be pointing to the last local variable actually
     sub mic1_SP, #4
     
+Main1: 
+    cmp r0, #0x00
+    beq nop
+    cmp r0, #0x60
+    beq iadd
+    cmp r0, #0x64
+    beq isub
+    cmp r0, #0x7E
+    beq iand
+    cmp r0, #0x80
+    beq ior
+    cmp r0, #0x59
+    beq dup
+    cmp r0, #0x57
+    beq pop
+    cmp r0, #0x5F
+    beq swap
+    cmp r0, #0x10
+    beq bipush
+    cmp r0, #0x15
+    beq iload
+    cmp r0, #0x36
+    beq istore
+    cmp r0, #0x84
+    beq iinc
+    cmp r0, #0xA7
+    beq goto
+    cmp r0, #0x9B
+    beq iflt
+    cmp r0, #0x99
+    beq ifeq
+    cmp r0, #0x9F
+    beq if_icmpeq
+    beq T
+    beq F
+    beq jsr
+    beq ret
+nop:
+    b Main1
     
-    _DBP_ mic1_LV
-    _DBP_ mic1_PC
-    _DBP_ mic1_SP
+iadd:
+    
+    b Main1            
 
+isub:
+    b Main1            
+
+iand:
+    b Main1 
+    
+ior:
+    b Main1
+
+dup:
+    b Main1
+    
+pop:
+    b Main1
+    
+swap:
+    b Main1
+    
+bipush:
+    b Main1
+    
+iload:
+    b Main1
+    
+istore:
+    b Main1
+    
+iinc:
+    b Main1
+    
+goto:
+    b Main1
+    
+iflt:
+    b Main1
+    
+ifeq:
+    b Main1
+    
+if_icmpeq:
+    b Main1
+    
+T:
+    b Main1
+    
+F:
+    b Main1
+    
+jsr:
+    b Main1
+    
+ret:
+    b Main1
     
     pop {lr}
     bx lr
