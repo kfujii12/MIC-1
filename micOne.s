@@ -192,9 +192,9 @@ iand:
     sub mic1_SP, #4
     mov mic1_MAR, mic1_SP
     _RD_
-    ldr mic1_H, [mic1_TOS]
+    mov mic1_H, mic1_TOS
     and mic1_TOS, mic1_MDR, mic1_H
-    ldr mic1_MDR, [mic1_TOS]
+    mov mic1_MDR, mic1_TOS
     _WR_
     b Main1 
     
@@ -202,16 +202,17 @@ ior:
     sub mic1_SP, #4
     mov mic1_MAR, mic1_SP
     _RD_
-    ldr mic1_H, [mic1_TOS]
+    mov mic1_H, mic1_TOS
     orr mic1_TOS, mic1_MDR, mic1_H
-    ldr mic1_MDR, [mic1_TOS]
+    mov mic1_MDR, mic1_TOS
     _WR_
     b Main1
 
 dup:
     add mic1_SP, #4
     mov mic1_MAR, mic1_SP
-    ldr mic1_MAR, [mic1_SP, #+4]!
+    add mic1_SP, #4
+    mov mic1_MAR, mic1_SP
     mov mic1_MDR, mic1_TOS
     _WR_
     b Main1
@@ -224,13 +225,15 @@ pop:
     
 swap:
     @ macro?
-    ldr mic1_MAR, [mic1_SP], #-4
+    sub r0, mic1_SP, #4
+    mov mic1_MAR, r0
     _RD_
-    ldr mic1_MAR, [mic1_SP]
+    mov mic1_MAR, mic1_SP
     mov mic1_H, mic1_MDR
     _WR_
     mov mic1_MDR, mic1_TOS
-    ldr mic1_MAR, [mic1_SP], #-4
+    sub r0, mic1_SP, #4
+    mov mic1_MAR, r0
     _WR_
     mov mic1_TOS, mic1_H
     b Main1
@@ -281,10 +284,12 @@ iinc:
     
 goto:
     sub mic1_OPC, mic1_PC, #-1
-    mov mic1_h, mic1_MBR, LSL #8
+goto2:
+    mov mic1_H, mic1_MBR, LSL #8
     _INC_PC_FETCH_
     orr mic1_H, mic1_MBRU
-    _INC_PC_FETCH_
+    add mic1_PC, mic1_OPC, mic1_H
+    _FETCH_
     b Main1
     
 iflt:
@@ -302,7 +307,7 @@ ifeq:
     _RD_
     movs mic1_OPC, mic1_TOS
     mov mic1_TOS, mic1_MDR
-    beq T
+    bne T
     b F
     
 if_icmpeq:
@@ -315,15 +320,15 @@ if_icmpeq:
     _RD_
     movs mic1_OPC, mic1_TOS
     mov mic1_TOS, mic1_MDR
-    beq T
+    bne T
     b F
     
 T:
-    sub mic1_OPC, mic1_PC, #-4
-    b Main1
+    sub mic1_OPC, mic1_PC, #-1
+    b goto2
     
 F:
-    add mic1_PC, #4
+    add mic1_PC, #1
     _INC_PC_FETCH_
     b Main1
     
@@ -380,7 +385,8 @@ ret:
     b Main1
 
 imul:
-    ldr mic1_MAR, [mic1_SP, #-4]!
+    sub mic1_SP, #4
+    mov mic1_MAR, mic1_SP
     _RD_
     mov mic1_H, mic1_TOS
     mul mic1_TOS, mic1_MDR, mic1_H
@@ -389,12 +395,15 @@ imul:
     b Main1   
 
 idiv:
-    ldr mic1_MAR, [mic1_SP, #-4]!
+    sub mic1_SP, #4
+    mov mic1_MAR, mic1_SP
     _RD_
     mov mic1_H, mic1_TOS
     mov r0, mic1_MDR
     mov r1, mic1_H
+    push {r2, r3}
     bl __aeabi_uidiv
+    pop {r2, r3}
     mov mic1_TOS, r0
     mov mic1_MDR, mic1_TOS
     _WR_
