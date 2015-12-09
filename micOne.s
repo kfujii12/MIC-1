@@ -21,13 +21,13 @@
 
 .macro _INC_PC_FETCH_
     add mic1_PC, #1
-    ldrsb mic1_MBR, [mic1_PC], #+1
-    ldrb mic1_MBRU, [mic1_PC], #+1
+    ldrsb mic1_MBR, [mic1_PC]
+    ldrb mic1_MBRU, [mic1_PC]
 .endm
 
 .macro _FETCH_
-    ldrsb mic1_MBR, [mic1_PC], #+1
-    ldrb mic1_MBRU, [mic1_PC], #+1
+    ldrsb mic1_MBR, [mic1_PC]
+    ldrb mic1_MBRU, [mic1_PC]
 .endm
 
 
@@ -49,7 +49,7 @@ mic1_H .req r12
 
 .balign 4
 debug_printf_format:
-    .asciz "%d\n"
+    .asciz "%#X\n"
 
 .balign 4
 memory: .skip 4096
@@ -60,7 +60,7 @@ readMode:
     
 .balign 4
 printf_format: 
-    .asciz "%#x\n"
+    .asciz "%d\n"
 
 .text
 
@@ -110,7 +110,7 @@ end:
     LSL mic1_SP, #3
     @ Or with the next byte
     @ multiply offset by 4 (shift by 2)
-    ldrb r12, [mic1_PC], #+1
+    ldrb r12, [mic1_PC]
     orr mic1_SP, r12
     LSL mic1_SP, #2
     @ Add to LV 
@@ -118,7 +118,13 @@ end:
     @ subtract one word (-4) because SP should be pointing to the last local variable actually
     sub mic1_SP, #4
     
+    mov mic1_CPP, #0
+
+    _INC_PC_FETCH_
+    
 Main1: 
+    mov r0, mic1_MBRU
+    _INC_PC_FETCH_
     cmp r0, #0x00
     beq nop
     cmp r0, #0x60
@@ -151,76 +157,88 @@ Main1:
     beq ifeq
     cmp r0, #0x9F
     beq if_icmpeq
-    beq T
-    beq F
+    cmp r0, #0xA8
     beq jsr
+    cmp r0, #0xA9
     beq ret
+    cmp r0, #0x68
+    beq imul
+    cmp r0, #0x6C
+    beq idiv
 nop:
     b Main1
     
 iadd:
-    ldr mic1_MAR, [mic1_SP, #-4]!
+    sub mic1_SP, #4
+    mov mic1_MAR, mic1_SP
     _RD_
-    ldr mic1_H, [mic1_TOS]
+    mov mic1_H, mic1_TOS
     add mic1_TOS, mic1_MDR, mic1_H
     mov mic1_MDR, mic1_TOS
     _WR_
     b Main1            
 
 isub:
-    ldr mic1_MAR, [mic1_SP, #-4]!
+    sub mic1_SP, #4
+    mov mic1_MAR, mic1_SP
     _RD_
-    ldr mic1_H, [mic1_TOS]
+    mov mic1_H, mic1_TOS
     sub mic1_TOS, mic1_MDR, mic1_H
     mov mic1_MDR, mic1_TOS
     _WR_
     b Main1            
 
 iand:
-    ldr mic1_MAR, [mic1_SP, #-4]
+    sub mic1_SP, #4
+    mov mic1_MAR, mic1_SP
     _RD_
     ldr mic1_H, [mic1_TOS]
     and mic1_TOS, mic1_MDR, mic1_H
-    ldr mic1_MDR, mic1_TOS
+    ldr mic1_MDR, [mic1_TOS]
     _WR_
     b Main1 
     
 ior:
-    ldr mic1_MAR, [mic1_SP, #-4]
+    sub mic1_SP, #4
+    mov mic1_MAR, mic1_SP
     _RD_
     ldr mic1_H, [mic1_TOS]
     orr mic1_TOS, mic1_MDR, mic1_H
-    ldr mic1_MDR, mic1_TOS
+    ldr mic1_MDR, [mic1_TOS]
     _WR_
     b Main1
 
 dup:
+    add mic1_SP, #4
+    mov mic1_MAR, mic1_SP
     ldr mic1_MAR, [mic1_SP, #+4]!
-    mov mic1_MDR, [mic1_TOS]
+    mov mic1_MDR, mic1_TOS
     _WR_
     b Main1
     
 pop:
-    ldr mic1_MAR, [mic1_SP, #-4]!
+    sub mic1_SP, #4
+    mov mic1_MAR, mic1_SP
     mov mic1_TOS, mic1_MDR
     b Main1
     
 swap:
     @ macro?
-    ldr mic1_MAR, [mic1_SP], #-1
+    ldr mic1_MAR, [mic1_SP], #-4
     _RD_
     ldr mic1_MAR, [mic1_SP]
     mov mic1_H, mic1_MDR
     _WR_
     mov mic1_MDR, mic1_TOS
-    ldr mic1_MAR, [mic1_SP], #-1
+    ldr mic1_MAR, [mic1_SP], #-4
     _WR_
     mov mic1_TOS, mic1_H
     b Main1
     
 bipush:
     /* This might be broken from this first line */
-    ldr mic1_MAR, [mic1_SP, #+1]!
+    add mic1_SP, #4
+    mov mic1_MAR, mic1_SP
     mov mic1_TOS, mic1_MBR
     mov mic1_MDR, mic1_TOS
     _WR_
@@ -231,7 +249,8 @@ iload:
     mov mic1_H, mic1_LV
     add mic1_MAR, mic1_MBRU, mic1_H
     _RD_
-    ldr mic1_MAR, [mic1_SP, #+1]!
+    add mic1_SP, #4
+    mov mic1_MAR, mic1_SP
     mov mic1_TOS, mic1_MDR
     _INC_PC_FETCH_
     _WR_
@@ -242,7 +261,8 @@ istore:
     add mic1_MAR, mic1_MBRU, mic1_H
     mov mic1_MDR, mic1_TOS
     _WR_
-    ldr mic1_MAR, [mic1_SP, #-1]!
+    sub mic1_SP, #4
+    mov mic1_MAR, mic1_SP
     _RD_
     mov mic1_TOS, mic1_MDR
     _INC_PC_FETCH_
@@ -261,14 +281,15 @@ iinc:
     
 goto:
     sub mic1_OPC, mic1_PC, #-1
-    mov h, mic1_MBR, LSL #8
+    mov mic1_h, mic1_MBR, LSL #8
     _INC_PC_FETCH_
     orr mic1_H, mic1_MBRU
     _INC_PC_FETCH_
     b Main1
     
 iflt:
-    ldr mic1_MAR, [mic1_SP, #-1]!
+    sub mic1_SP, #4
+    mov mic1_MAR, mic1_SP
     _RD_
     movs mic1_OPC, mic1_TOS
     mov mic1_TOS, mic1_MDR
@@ -276,7 +297,8 @@ iflt:
     b F
     
 ifeq:
-    ldr mic1_MAR, [mic1_SP, #-1]!
+    sub mic1_SP, #4
+    mov mic1_MAR, mic1_SP
     _RD_
     movs mic1_OPC, mic1_TOS
     mov mic1_TOS, mic1_MDR
@@ -284,9 +306,11 @@ ifeq:
     b F
     
 if_icmpeq:
-    ldr mic1_MAR, [mic1_SP, #-1]!
+    sub mic1_SP, #4
+    mov mic1_MAR, mic1_SP
     _RD_
-    ldr mic1_MAR, [mic1_SP, #-1]!
+    sub mic1_SP, #4
+    mov mic1_MAR, mic1_SP
     mov mic1_H, mic1_MDR
     _RD_
     movs mic1_OPC, mic1_TOS
@@ -295,26 +319,28 @@ if_icmpeq:
     b F
     
 T:
-    sub mic1_OPC, mic1_PC, #-1
+    sub mic1_OPC, mic1_PC, #-4
     b Main1
     
 F:
-    add mic1_PC, #1
+    add mic1_PC, #4
     _INC_PC_FETCH_
     b Main1
     
 jsr:
     add mic1_SP, mic1_MBRU
-    add mic1_SP, #R
+    add mic1_SP, #4
     mov mic1_MDR, mic1_CPP
     mov mic1_CPP, mic1_SP
     mov mic1_MAR, mic1_CPP
     _WR_
     add mic1_MDR, mic1_PC, #4
-    ldr mic1_MAR, [mic1_SP, #+4]!
+    add mic1_SP, #4
+    mov mic1_MAR, mic1_SP
     _WR_
     mov mic1_MDR, mic1_LV
-    ldr mic1_MAR, [mic1_SP, #+1]!
+    add mic1_SP, #4
+    mov mic1_MAR, mic1_SP
     _WR_
     sub mic1_LV, mic1_SP, #2
     sub mic1_LV, mic1_MBRU
@@ -332,6 +358,9 @@ jsr:
     b Main1
     
 ret:
+    /* Check for ret from main (cpp == 0) */
+    cmp mic1_CPP, #0
+    beq Main1End
     mov mic1_MAR, mic1_CPP
     _RD_
     /* need nop? */
@@ -349,9 +378,36 @@ ret:
     mov mic1_MDR, mic1_TOS
     _WR_
     b Main1
+
+imul:
+    ldr mic1_MAR, [mic1_SP, #-4]!
+    _RD_
+    mov mic1_H, mic1_TOS
+    mul mic1_TOS, mic1_MDR, mic1_H
+    mov mic1_MDR, mic1_TOS
+    _WR_
+    b Main1   
+
+idiv:
+    ldr mic1_MAR, [mic1_SP, #-4]!
+    _RD_
+    mov mic1_H, mic1_TOS
+    mov r0, mic1_MDR
+    mov r1, mic1_H
+    bl __aeabi_uidiv
+    mov mic1_TOS, r0
+    mov mic1_MDR, mic1_TOS
+    _WR_
+    b Main1
+
+Main1End: 
+    ldr r0, =printf_format
+    mov r1, mic1_TOS
+    bl printf
     
     pop {lr}
     bx lr
+
     
 .endfunc
 
@@ -359,3 +415,5 @@ ret:
 .global fopen
 .global fgetc
 .global putchar
+.global printf
+.global __aeabi_uidiv
