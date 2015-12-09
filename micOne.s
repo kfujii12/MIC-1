@@ -31,7 +31,6 @@
 .endm
 
 
-
 /***** NAMING REGISTERS *****/
 mic1_MAR .req r2 
 mic1_MDR .req r3
@@ -245,7 +244,7 @@ bipush:
     mov mic1_TOS, mic1_MBR
     mov mic1_MDR, mic1_TOS
     _WR_
-    _INC_PC_FETCH_
+    _INC_PC_FETCH_   
     b Main1
     
 iload:
@@ -283,11 +282,10 @@ iinc:
     b Main1
     
 goto:
-    sub mic1_OPC, mic1_PC, #-1
-goto2:
+    sub mic1_OPC, mic1_PC, #1
     mov mic1_H, mic1_MBR, LSL #8
     _INC_PC_FETCH_
-    orr mic1_H, mic1_MBRU
+    orr mic1_H, mic1_MBRU, mic1_H
     add mic1_PC, mic1_OPC, mic1_H
     _FETCH_
     b Main1
@@ -307,7 +305,7 @@ ifeq:
     _RD_
     movs mic1_OPC, mic1_TOS
     mov mic1_TOS, mic1_MDR
-    bne T
+    beq T
     b F
     
 if_icmpeq:
@@ -318,14 +316,14 @@ if_icmpeq:
     mov mic1_MAR, mic1_SP
     mov mic1_H, mic1_MDR
     _RD_
-    movs mic1_OPC, mic1_TOS
+    mov mic1_OPC, mic1_TOS
     mov mic1_TOS, mic1_MDR
-    bne T
+    subs r0, mic1_OPC, mic1_H
+    beq T
     b F
     
 T:
-    sub mic1_OPC, mic1_PC, #-1
-    b goto2
+    b goto
     
 F:
     add mic1_PC, #1
