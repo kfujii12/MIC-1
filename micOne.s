@@ -281,25 +281,25 @@ bipush:
     
 iload:
     mov mic1_H, mic1_LV
-    add mic1_MAR, mic1_MBRU, mic1_H
+    add mic1_MAR, mic1_H, mic1_MBRU, LSL #2
     _RD_
     add mic1_SP, #4
     mov mic1_MAR, mic1_SP
-    mov mic1_TOS, mic1_MDR
     _INC_PC_FETCH_
     _WR_
+    mov mic1_TOS, mic1_MDR
     b Main1
     
 istore:
     mov mic1_H, mic1_LV
-    add mic1_MAR, mic1_MBRU, mic1_H
+    add mic1_MAR, mic1_H, mic1_MBRU, LSL #2
     mov mic1_MDR, mic1_TOS
     _WR_
     sub mic1_SP, #4
     mov mic1_MAR, mic1_SP
     _RD_
-    mov mic1_TOS, mic1_MDR
     _INC_PC_FETCH_
+    mov mic1_TOS, mic1_MDR
     b Main1
     
 iinc:
@@ -332,11 +332,18 @@ iflt:
     b F
     
 ifeq:
+    @ Read in next-to-top word of stack
     sub mic1_SP, #4
     mov mic1_MAR, mic1_SP
     _RD_
+    
+    @ Save TOS in OPC temporarily
     movs mic1_OPC, mic1_TOS
+    
+    @ Put new top of stack in TOS
     mov mic1_TOS, mic1_MDR
+    
+    @ Branch on Z bit
     beq T
     b F
     
@@ -443,7 +450,7 @@ ret:
     mov mic1_MAR, mic1_LV
     mov mic1_SP, mic1_MAR
 
-    @ Restor LV
+    @ Restore LV
     mov mic1_LV, mic1_MDR
 
     @ Push return value 
