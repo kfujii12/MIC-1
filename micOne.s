@@ -68,62 +68,85 @@ printf_format:
 main: 
     push {lr}
 
-    /* Open the file to read */
-    /* Parameters are: r0: number of params, r1: mic1, r2: filename */
-    ldr r0, [r1, #+4]!          /* The first argument sent in is micOne.s, so */
-                                /* we want the next parameter */
+    @ Open the file to read 
+    @ Parameters are: r0: number of params, r1: mic1, r2: filename
+    @ The first argument sent in is micOne.s, so
+    @ we want the next parameter
+    ldr r0, [r1, #+4]!          
     
     ldr r1, =readMode
     
-    bl fopen                    /* Open the file. This will return with a */
-                                /* file pointer in r0 */
-    mov r11, r0                  /* Save file pointer so we can access later */                            
+    @ Open the file. 
+    @ This will return with a file pointer in r0
+    bl fopen                    
+
+    @ Save file pointer so we can access later
+    @ Note: Don't store in r12. This isn't preserved. 
+    mov r11, r0                                              
     
-    /* Set up LV */ 
+    @ Set up LV
     ldr mic1_LV, =memory
     
-    /* Need to loop through this until you hit an EOF */
+    @ Need to loop through file until you hit an EOF 
 loop:
     bl fgetc
     
-    /* Read bytes into "memory" */
+    @ Read bytes into "memory" 
     cmp r0, #-1
     
-    /* If char equals EOF (-1), jump to end */
+    @ If char equals EOF (-1), jump to end */
     beq end
     
-    /* Set PC, SP, LV */
-    strb r0, [mic1_LV], #+1    /* Put the first character into the top of the stack and move the stack pointer */
-    mov r0, r11                /* Move the file pointer back to r0 */
+    @ Set PC, SP, LV 
+    @ Put the first character into the top of the stack and move the stack 
+    @ pointer
+    strb r0, [mic1_LV], #+1    
+
+    @ Move the file pointer back to r0
+    mov r0, r11                
     b loop
 end:   
-    /* Set the PC to the start of the stack */
+    @ Set the PC to the start of the stack
     ldr mic1_PC, =memory
       
-    /* The LV should be in the correct position already, one byte past the PC */
-    /* The SP should use the number of parameters and the LV to calculate its position */
-    @ load stack pointer with the first byte from the program and increment the PC
+    /* The LV should be in the correct position already, one byte past the PC 
+       The SP should use the number of parameters and the LV to calculate its 
+       position */
+
+    @ load stack pointer with the first byte from the program and increment 
+    @ the PC
     @ Shift by 8 bits
     ldrb r12, [mic1_PC], #+1
     mov mic1_SP, r12
     LSL mic1_SP, #3
+
     @ Or with the next byte
     @ multiply offset by 4 (shift by 2)
     ldrb r12, [mic1_PC]
     orr mic1_SP, r12
     LSL mic1_SP, #2
+
     @ Add to LV 
     add mic1_SP, mic1_LV
-    @ subtract one word (-4) because SP should be pointing to the last local variable actually
+
+    @ subtract one word (-4) because SP should be pointing to the last 
+    @ local variable actually
     sub mic1_SP, #4
     
+    @ Set CPP to 0
     mov mic1_CPP, #0
 
+    @ Do an initial inc and fetch
     _INC_PC_FETCH_
     
 Main1: 
+    @ Save the MBRU (which holds the opcode) so we can cmp with it
     mov r0, mic1_MBRU
+
+    @ Inc and fetch so we have the next byte
     _INC_PC_FETCH_
+
+    @ Figure out which instruction to jump to
     cmp r0, #0x00
     beq nop
     cmp r0, #0x60
@@ -164,20 +187,29 @@ Main1:
     beq imul
     cmp r0, #0x6C
     beq idiv
+
 nop:
+    @ Do nothing
     b Main1
     
 iadd:
+    @Read in next-to-top word on stack
     sub mic1_SP, #4
     mov mic1_MAR, mic1_SP
     _RD_
+
+    @ H = top of stack
     mov mic1_H, mic1_TOS
+
+    @ Add top two words; write to top of stack
     add mic1_TOS, mic1_MDR, mic1_H
     mov mic1_MDR, mic1_TOS
     _WR_
+
     b Main1            
 
 isub:
+    @ Read in next-to-top word on stack
     sub mic1_SP, #4
     mov mic1_MAR, mic1_SP
     _RD_
@@ -331,55 +363,94 @@ F:
     b Main1
     
 jsr:
+    @ Save space for locals
     add mic1_SP, mic1_MBRU
     add mic1_SP, #4
+
+    @ Push old link ptr
     mov mic1_MDR, mic1_CPP
+
+    @ And set link pointer
     mov mic1_CPP, mic1_SP
     mov mic1_MAR, mic1_CPP
     _WR_
+
+    @ Push return PC
     add mic1_MDR, mic1_PC, #4
     add mic1_SP, #4
     mov mic1_MAR, mic1_SP
     _WR_
+
+    @ Push old LV
     mov mic1_MDR, mic1_LV
     add mic1_SP, #4
     mov mic1_MAR, mic1_SP
     _WR_
-    sub mic1_LV, mic1_SP, #2
+
+    @ Set new LV
+    sub mic1_LV, mic1_SP, #8
     sub mic1_LV, mic1_MBRU
+
+    @ Get # args
     _INC_PC_FETCH_
-    /* Need nop? */
+
+    @ Adjust LV to first arg
     sub mic1_LV, mic1_MBRU
+
+    @ Get high byte of address
     _INC_PC_FETCH_
-    /* is this shift left 8 or 3 */
+
+    @ Shift and store address
     mov mic1_H, mic1_MBR, LSL #8
+
+    @ Get low byte of address
     _INC_PC_FETCH_
+
+    @ Combine address and get opcode
     orr r0, mic1_H, mic1_MBRU
     sub mic1_PC, #4
     add mic1_PC, r0
     _FETCH_
+
+    @ Transfer control
     b Main1
     
 ret:
-    /* Check for ret from main (cpp == 0) */
+    @ Check for return from main (CPP == 0)
     cmp mic1_CPP, #0
     beq Main1End
+
+    @ Get link ptr
     mov mic1_MAR, mic1_CPP
     _RD_
-    /* need nop? */
+
+    @ Restore CPP (old link ptr)
     mov mic1_CPP, mic1_MDR
-    add mic1_MAR, #1
+
+    @ Get PC
+    add mic1_MAR, #4
     _RD_
-    /* nop? */
+
+    @ Restore PC and get opcode
     mov mic1_PC, mic1_MDR
     _FETCH_
-    add mic1_MAR, #1
+
+    @ Get LV
+    add mic1_MAR, #4
     _RD_
+
+    @ Drop local stack 
     mov mic1_MAR, mic1_LV
     mov mic1_SP, mic1_MAR
+
+    @ Restor LV
     mov mic1_LV, mic1_MDR
+
+    @ Push return value 
     mov mic1_MDR, mic1_TOS
     _WR_
+
+    @ Return control
     b Main1
 
 imul:
