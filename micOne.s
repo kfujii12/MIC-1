@@ -213,121 +213,203 @@ isub:
     sub mic1_SP, #4
     mov mic1_MAR, mic1_SP
     _RD_
+
+    @ H = top of stack
     mov mic1_H, mic1_TOS
+
+    @ Do subtraction; write to TOS
     sub mic1_TOS, mic1_MDR, mic1_H
     mov mic1_MDR, mic1_TOS
     _WR_
     b Main1            
 
 iand:
+    @ Read in next-to-top word on stack
     sub mic1_SP, #4
     mov mic1_MAR, mic1_SP
     _RD_
+
+    @ H = TOS
     mov mic1_H, mic1_TOS
+
+    @ Do AND; write to new TOS
     and mic1_TOS, mic1_MDR, mic1_H
     mov mic1_MDR, mic1_TOS
     _WR_
     b Main1 
     
 ior:
+    @ Read in next-to-top word on stack
     sub mic1_SP, #4
     mov mic1_MAR, mic1_SP
     _RD_
+
+    @ H = TOS
     mov mic1_H, mic1_TOS
+
+    @ Do OR; write to new TOS
     orr mic1_TOS, mic1_MDR, mic1_H
     mov mic1_MDR, mic1_TOS
     _WR_
     b Main1
 
 dup:
+    @ Increment SP and copy to MAR 
     add mic1_SP, #4
     mov mic1_MAR, mic1_SP
-    add mic1_SP, #4
-    mov mic1_MAR, mic1_SP
+
+    @ Write new stack word
     mov mic1_MDR, mic1_TOS
     _WR_
     b Main1
     
 pop:
+    @ Read in next-to-top word on stack
     sub mic1_SP, #4
     mov mic1_MAR, mic1_SP
+    _RD_
+
+    @ Copy new word to TOS
     mov mic1_TOS, mic1_MDR
     b Main1
     
 swap:
     @ macro?
+    @ Set MAR to SP - 1; read 2nd word from stack
     sub r0, mic1_SP, #4
     mov mic1_MAR, r0
     _RD_
+
+    @ Set MAR to top word
     mov mic1_MAR, mic1_SP
+
+    @ Save TOS in H; write 2nd word to top of stack
     mov mic1_H, mic1_MDR
     _WR_
+
+    @ Copy old TOS to MDR
     mov mic1_MDR, mic1_TOS
+
+    @ Set MAR to SP - 1; write as 2nd word on stack
     sub r0, mic1_SP, #4
     mov mic1_MAR, r0
     _WR_
+
+    @ Update TOS
     mov mic1_TOS, mic1_H
     b Main1
     
 bipush:
-    /* This might be broken from this first line */
+    @ MBR = the byte to push onto stack
     add mic1_SP, #4
     mov mic1_MAR, mic1_SP
+
+    @ Sign extend constant and push onto stack
     mov mic1_TOS, mic1_MBR
     mov mic1_MDR, mic1_TOS
     _WR_
-    _INC_PC_FETCH_   
+
+    @ Incrememnt PC, fetch next opcode
+    _INC_PC_FETCH_  
     b Main1
     
 iload:
+    @ MBR contains index; copy LV to H
     mov mic1_H, mic1_LV
+
+    @ MAR = address of local variable to push
     add mic1_MAR, mic1_H, mic1_MBRU, LSL #2
     _RD_
+
+    @ SP points to new top of stack; prepare write
     add mic1_SP, #4
     mov mic1_MAR, mic1_SP
+
+    @ Inc PC; get next opcode; write top of stack
     _INC_PC_FETCH_
     _WR_
-    mov mic1_TOS, mic1_MDR
+
+    @ Update TOS
+    mov mic1_TOS, mic1_MDR 
+    _DBP_ mic1_TOS
     b Main1
     
 istore:
+    @ MBR contains index; copy LV to H
     mov mic1_H, mic1_LV
+
+    @ MAR = MBRU + H
     add mic1_MAR, mic1_H, mic1_MBRU, LSL #2
+
+    @ Copyt TOS to MDR; write word
     mov mic1_MDR, mic1_TOS
     _WR_
+
+    @ Read in next-to-top word on stack
     sub mic1_SP, #4
     mov mic1_MAR, mic1_SP
     _RD_
+
+    @ Inc PC; fetch next opcode
     _INC_PC_FETCH_
+
+    @ Update TOS
     mov mic1_TOS, mic1_MDR
     b Main1
     
 iinc:
+    @ MBR contains index; copy LV to H
     mov mic1_H, mic1_LV
-    add mic1_MAR, mic1_MBRU, mic1_H
+
+    @ MAR = MBRU + H; read variable
+    add mic1_MAR, mic1_MBRU, mic1_H, LSL #2
     _RD_
+
+    @ Copy variable to H
     mov mic1_H, mic1_MDR
+
+    @ Fetch constant
     _INC_PC_FETCH_
+
+    @ Put sum in MDR; update variable
     ADD mic1_MDR, mic1_MBR, mic1_H
     _WR_
+
+    @ Fetch next opcode
     _INC_PC_FETCH_
     b Main1
     
 goto:
+    @ Save address of opcode
     sub mic1_OPC, mic1_PC, #1
+
+    @ Shift and save signed first byte in H
     mov mic1_H, mic1_MBR, LSL #8
+
+    @ MBR = 1st byte of offset; fetch 2nd byte
     _INC_PC_FETCH_
+
+    @ H = 16-bit branch offset
     orr mic1_H, mic1_MBRU, mic1_H
+
+    @ Add offset to OPC
     add mic1_PC, mic1_OPC, mic1_H
     _FETCH_
     b Main1
     
 iflt:
+    @ Read in next-to-top word on stack
     sub mic1_SP, #4
     mov mic1_MAR, mic1_SP
     _RD_
+
+    @ Save TOS in OPC temporarily
     movs mic1_OPC, mic1_TOS
+
+    @ Put new top of stack in TOS
     mov mic1_TOS, mic1_MDR
+
+    @ Branch on N bit
     bmi T
     b F
     
@@ -336,7 +418,6 @@ ifeq:
     sub mic1_SP, #4
     mov mic1_MAR, mic1_SP
     _RD_
-    
     @ Save TOS in OPC temporarily
     movs mic1_OPC, mic1_TOS
     
@@ -348,30 +429,45 @@ ifeq:
     b F
     
 if_icmpeq:
+    @ Read in next-to-top word of stack
     sub mic1_SP, #4
     mov mic1_MAR, mic1_SP
     _RD_
+
+    @ Set MAR to read in new top-of-stack
     sub mic1_SP, #4
     mov mic1_MAR, mic1_SP
+
+    @ Copy second stack word to H
     mov mic1_H, mic1_MDR
     _RD_
+
+    @ Save TOs in OPC temporarily
     mov mic1_OPC, mic1_TOS
+
+    @ Put new top of stack in TOS
     mov mic1_TOS, mic1_MDR
     subs r0, mic1_OPC, mic1_H
+
+    @ If top 2 words are equal, goto T, else goto F
     beq T
     b F
     
 T:
+    @ Same as goto1
     b goto
     
 F:
+    @ Skip first offset byte
     add mic1_PC, #1
+
+    @ PC now points to the next opcode
     _INC_PC_FETCH_
     b Main1
     
 jsr:
     @ Save space for locals
-    add mic1_SP, mic1_MBRU
+    add mic1_SP, mic1_MBRU, LSL #2
     add mic1_SP, #4
 
     @ Push old link ptr
@@ -396,7 +492,7 @@ jsr:
 
     @ Set new LV
     sub mic1_LV, mic1_SP, #8
-    sub mic1_LV, mic1_MBRU
+    sub mic1_LV, mic1_MBRU, LSL #2
 
     @ Get # args
     _INC_PC_FETCH_
