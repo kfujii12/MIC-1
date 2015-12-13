@@ -1,4 +1,5 @@
 /* -- micOne.s */
+/* This is a simulator that implements Tanenbaum's Mic-1. */
 /* author: 1668650 */
 
 .macro _DBP_ x
@@ -48,7 +49,7 @@ mic1_H .req r12
 
 .balign 4
 debug_printf_format:
-    .asciz "%#X\n"
+    .asciz "%d\n"
 
 .balign 4
 memory: .skip 4096
@@ -316,11 +317,11 @@ bipush:
 iload:
     @ MBR contains index; copy LV to H
     mov mic1_H, mic1_LV
-
+    
     @ MAR = address of local variable to push
     add mic1_MAR, mic1_H, mic1_MBRU, LSL #2
     _RD_
-
+    
     @ SP points to new top of stack; prepare write
     add mic1_SP, #4
     mov mic1_MAR, mic1_SP
@@ -331,7 +332,6 @@ iload:
 
     @ Update TOS
     mov mic1_TOS, mic1_MDR 
-    _DBP_ mic1_TOS
     b Main1
     
 istore:
@@ -362,7 +362,7 @@ iinc:
     mov mic1_H, mic1_LV
 
     @ MAR = MBRU + H; read variable
-    add mic1_MAR, mic1_MBRU, mic1_H, LSL #2
+    add mic1_MAR, mic1_H, mic1_MBRU, LSL #2
     _RD_
 
     @ Copy variable to H
@@ -498,7 +498,7 @@ jsr:
     _INC_PC_FETCH_
 
     @ Adjust LV to first arg
-    sub mic1_LV, mic1_MBRU
+    sub mic1_LV, mic1_MBRU, LSL #2
 
     @ Get high byte of address
     _INC_PC_FETCH_
